@@ -4,6 +4,34 @@
 #include <iostream>
 #include "Config.h"
 
+enum class AppState {
+    Start,
+    Menu,
+    Playing,
+    Paused,
+    End
+};
+
+void displayStartScreen() {
+    // 显示启动界面
+}
+
+void displayMenuScreen() {
+    // 显示菜单界面
+}
+
+void displayPlayingScreen() {
+    // 显示游戏界面
+}
+
+void displayPausedScreen() {
+    // 显示暂停界面
+}
+
+void displayEndScreen() {
+    // 显示结束界面
+}
+
 int main(){
     // 创建一个SFML窗口
     sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), WINDOW_TITLE);
@@ -32,6 +60,9 @@ int main(){
         std::cerr << "字体加载失败" << std::endl;
     }
 
+    // 设置界面状态
+    AppState appState = AppState::Start;
+
     sf::Clock deltaClock;
     while (window.isOpen()) {
         // 事件处理
@@ -49,7 +80,28 @@ int main(){
         ImGui::Text("这是一个基本的图形化窗口示例。");
         ImGui::End();
 
-        window.clear(sf::Color(30, 30, 30));
+        switch (appState) {
+            case AppState::Start:
+                // 启动界面
+                displayStartScreen();
+                break;
+            case AppState::Menu:
+                // 菜单界面
+                displayMenuScreen();
+                break;
+            case AppState::Playing:
+                // 游戏界面
+                displayPlayingScreen();
+                break;
+            case AppState::Paused:
+                // 暂停界面
+                displayPausedScreen();
+                break;
+            case AppState::End:
+                // 结束界面
+                displayEndScreen();
+        }
+
         ImGui::SFML::Render(window);
         window.display();
     }
