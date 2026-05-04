@@ -1,6 +1,7 @@
 ﻿#include <SFML/Graphics.hpp>
-#include <imgui.h>
-#include <imgui-SFML.h>
+#include "imgui.h"
+#include "imgui-SFML.h"
+#include "SimpleIni.h"
 #include <iostream>
 #include "Config.h"
 
@@ -12,24 +13,95 @@ enum class AppState {
     End
 };
 
-void displayStartScreen() {
-    // 显示启动界面
+// 渲染与处理启动界面
+AppState updateAndRenderStartScreen(sf::RenderWindow& window, const std::vector<sf::Event>& events) {
+    AppState nextState = AppState::Start;
+
+    ImGui::Begin("欢迎来到游戏", nullptr, 
+        ImGuiWindowFlags_AlwaysAutoResize | 
+        ImGuiWindowFlags_NoCollapse | 
+        ImGuiWindowFlags_NoResize | 
+        ImGuiWindowFlags_NoMove);
+    ImGui::SetWindowPos(ImVec2(
+        (window.getSize().x - ImGui::GetWindowWidth()) * 0.5f,
+        (window.getSize().y - ImGui::GetWindowHeight()) * 0.4f
+    ));
+
+    if (ImGui::Button("开始游戏", ImVec2(200, 40))) {
+        nextState = AppState::Menu;
+    }
+    if (ImGui::Button("设置", ImVec2(200, 40))) {
+        // 设置按钮暂不处理
+    }
+    if (ImGui::Button("退出游戏", ImVec2(200, 40))) {
+        window.close();
+    }
+    ImGui::End();
+
+    return nextState;
 }
 
-void displayMenuScreen() {
-    // 显示菜单界面
+// 渲染与处理菜单界面
+AppState updateAndRenderMenuScreen(sf::RenderWindow& window, const std::vector<sf::Event>& events) {
+    AppState nextState = AppState::Menu;
+
+    // 检测esc键
+    for (const auto& event : events) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape)){
+            nextState = AppState::Start;
+        }
+    }
+
+    // 创建返回键
+    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Always);
+    ImGui::Begin("#返回键", nullptr, 
+        ImGuiWindowFlags_AlwaysAutoResize | 
+        ImGuiWindowFlags_NoCollapse | 
+        ImGuiWindowFlags_NoResize | 
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoBackground);
+
+    if (ImGui::Button("返回")) {
+        nextState = AppState::Start;
+    }
+    ImGui::End();
+
+    // 创建菜单
+    ImGui::Begin("菜单", nullptr, 
+        ImGuiWindowFlags_AlwaysAutoResize | 
+        ImGuiWindowFlags_NoCollapse | 
+        ImGuiWindowFlags_NoResize | 
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoBackground);
+    ImGui::SetWindowPos(ImVec2(
+        (window.getSize().x - ImGui::GetWindowWidth()) * 0.5f,
+        (window.getSize().y - ImGui::GetWindowHeight()) * 0.5f
+    ));
+
+    if (ImGui::Button("故事模式", ImVec2(200, 40))) {
+        // 还没有完成
+    }
+    // 无尽模式按钮
+    if (ImGui::Button("无尽模式", ImVec2(200, 40))) {
+        nextState = AppState::Playing; 
+    }
+    ImGui::End();
+
+    return nextState;
 }
 
-void displayPlayingScreen() {
-    // 显示游戏界面
+// 渲染与处理游戏界面
+AppState updateAndRenderPlayingScreen(sf::RenderWindow& window, const std::vector<sf::Event>& events) {
 }
 
-void displayPausedScreen() {
-    // 显示暂停界面
+// 渲染与处理暂停界面
+AppState updateAndRenderPausedScreen(sf::RenderWindow& window, const std::vector<sf::Event>& events) {
 }
 
-void displayEndScreen() {
-    // 显示结束界面
+// 渲染与处理结束界面
+AppState updateAndRenderEndScreen(sf::RenderWindow& window, const std::vector<sf::Event>& events) {
 }
 
 int main(){
@@ -60,46 +132,48 @@ int main(){
         std::cerr << "字体加载失败" << std::endl;
     }
 
-    // 设置界面状态
-    AppState appState = AppState::Start;
+    // 界面状态
+    AppState state = AppState::Start;
 
     sf::Clock deltaClock;
     while (window.isOpen()) {
-        // 事件处理
-        while (const std::optional event = window.pollEvent()) {
-            if (event->is<sf::Event::Closed>()) {
+        // 清空屏幕
+        window.clear();
+
+        // 收集事件
+        std::vector<sf::Event> events;
+        while (auto eventOpt = window.pollEvent()) {
+            sf::Event event = *eventOpt;
+            if (event.is<sf::Event::Closed>()) {
                 window.close();
             }
-            ImGui::SFML::ProcessEvent(window, *event);
+            ImGui::SFML::ProcessEvent(window, event);
+            events.push_back(event); // 保存事件供后续处理
         }
 
         ImGui::SFML::Update(window, deltaClock.restart());
 
-        // ImGui示例窗口
-        ImGui::Begin("Hello, ImGui!");
-        ImGui::Text("这是一个基本的图形化窗口示例。");
-        ImGui::End();
-
-        switch (appState) {
+        // 根据当前状态更新界面并渲染
+        switch (state) {
             case AppState::Start:
                 // 启动界面
-                displayStartScreen();
+                state = updateAndRenderStartScreen(window, events);
                 break;
             case AppState::Menu:
                 // 菜单界面
-                displayMenuScreen();
+                state = updateAndRenderMenuScreen(window, events);
                 break;
             case AppState::Playing:
                 // 游戏界面
-                displayPlayingScreen();
+                state = updateAndRenderPlayingScreen(window, events);
                 break;
             case AppState::Paused:
                 // 暂停界面
-                displayPausedScreen();
+                state = updateAndRenderPausedScreen(window, events);
                 break;
             case AppState::End:
                 // 结束界面
-                displayEndScreen();
+                state = updateAndRenderEndScreen(window, events);
         }
 
         ImGui::SFML::Render(window);
