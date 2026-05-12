@@ -38,6 +38,9 @@ public:
     void setRange(float r);
     float getRange() const;
 
+    void setMinRange(float r);
+    float getMinRange() const;
+
     void setMaxMana(int m);
     int getMaxMana() const;
     void setMana(int m);
@@ -64,7 +67,7 @@ public:
     virtual std::unique_ptr<Unit> clone() const = 0;
 
     // 默认绘制实现（可被覆盖）
-    virtual void render(sf::RenderWindow& window);
+    virtual void render(sf::RenderWindow& window) const;
 
     // 攻击与受伤（可覆盖）
     virtual void attack(Unit& target); // 默认检查距离并扣血

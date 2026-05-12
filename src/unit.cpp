@@ -3,13 +3,11 @@
 
 Unit::Unit(sf::Vector2f pos , int starRank_)
 : position(pos)
+, size({64.f, 64.f})
 , velocity({0.0f, 0.0f})
 , m_owner(Owner::Neutral)
 , starRank(starRank_) {
-    shape.setSize(size);
-    shape.setOrigin(size * 0.5f);
-    shape.setPosition(position);
-    shape.setFillColor(color);
+    syncShape();
 }
 
 void Unit::setPosition(const sf::Vector2f& p) {
@@ -39,6 +37,9 @@ int Unit::getATK() const { return atk; }
 
 void Unit::setRange(float r) { max_range = r; }
 float Unit::getRange() const { return max_range; }
+
+void Unit::setMinRange(float r) { min_range = r; }
+float Unit::getMinRange() const { return min_range; }
 
 void Unit::setMaxMana(int m) { maxMana = m; if (mana > maxMana) mana = maxMana; }
 int Unit::getMaxMana() const { return maxMana; }
@@ -87,8 +88,7 @@ void Unit::syncShape() {
     shape.setFillColor(color);
 }
 
-void Unit::render(sf::RenderWindow& window) {
-    syncShape();
+void Unit::render(sf::RenderWindow& window) const {
     window.draw(shape);
 }
 
@@ -105,20 +105,18 @@ void Unit::attack(Unit& target) {
     if (!isAlive() || !target.isAlive()) return;
     // 计算中心距离
     sf::Vector2f diff = target.getPosition() - position;
-    float dist = std::sqrt(diff.x*diff.x + diff.y*diff.y);
-    if (dist <= max_range && dist > min_range) {
+    float dist2 = diff.x*diff.x + diff.y*diff.y;
+    if (dist2 <= max_range*max_range && dist2 > min_range*min_range) {
         target.takeDamage(atk);
     }
 }
 
 void Unit::takeDamage(int dmg) {
     if (!isAlive()) return;
-    hp -= dmg;
-    if (hp < 0) hp = 0;
+    setHP(hp - dmg);
 }
 
 void Unit::heal(int amount) {
     if (!isAlive()) return;
-    hp += amount;
-    if (hp > maxHp) hp = maxHp;
+    setHP(hp + amount);
 }

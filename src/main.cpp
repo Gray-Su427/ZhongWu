@@ -4,41 +4,39 @@
 #include "SimpleIni.h"
 #include <iostream>
 #include "unit.h"
-#include "DataConfig.h"
+#include "DisplayConfig.h"
+#include "GameData.h"
 #include <filesystem>
 
 enum class AppState {
     Start,
+    Setting,
     Menu,
     Playing,
     Paused,
     End
 };
 
-enum class gameState {
-    Preparation,
-    Fight
-};
 
 // 渲染与处理启动界面
-AppState updateAndRenderStartScreen(sf::RenderWindow& window, const std::vector<sf::Event>& events) {
+AppState updateAndRenderStartScreen(sf::RenderWindow& window, const std::vector<sf::Event>& /*events*/) {
     AppState nextState = AppState::Start;
 
+    ImGui::SetNextWindowPos(ImVec2(
+        window.getSize().x * 0.5f,
+        window.getSize().y * 0.4f
+    ), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::Begin("欢迎来到游戏", nullptr, 
         ImGuiWindowFlags_AlwaysAutoResize | 
         ImGuiWindowFlags_NoCollapse | 
         ImGuiWindowFlags_NoResize | 
         ImGuiWindowFlags_NoMove);
-    ImGui::SetWindowPos(ImVec2(
-        (window.getSize().x - ImGui::GetWindowWidth()) * 0.5f,
-        (window.getSize().y - ImGui::GetWindowHeight()) * 0.4f
-    ));
 
     if (ImGui::Button("开始游戏", ImVec2(200, 40))) {
         nextState = AppState::Menu;
     }
     if (ImGui::Button("设置", ImVec2(200, 40))) {
-        // 设置按钮暂不处理
+        nextState = AppState::Setting;
     }
     if (ImGui::Button("退出游戏", ImVec2(200, 40))) {
         window.close();
@@ -48,13 +46,34 @@ AppState updateAndRenderStartScreen(sf::RenderWindow& window, const std::vector<
     return nextState;
 }
 
+// 渲染与处理设置界面
+AppState updateAndRenderSettingScreen(sf::RenderWindow& window, const std::vector<sf::Event>& /*events*/){
+    AppState nextstate = AppState::Setting;
+
+    ImGui::SetNextWindowPos(ImVec2(
+        window.getSize().x * 0.5f,
+        window.getSize().y * 0.4f
+    ), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::Begin("设置", nullptr,
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize);
+    if (ImGui::Button("保存并退出", ImVec2(200, 40))){
+        nextstate = AppState::Start;
+    }
+    ImGui::End();
+
+    return nextstate;
+}
+
 // 渲染与处理菜单界面
 AppState updateAndRenderMenuScreen(sf::RenderWindow& window, const std::vector<sf::Event>& events) {
     AppState nextState = AppState::Menu;
 
-    // 检测esc键
+    // 检测esc键（使用事件匹配而非实时状态查询）
     for (const auto& event : events) {
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape)){
+        if (event.is<sf::Event::KeyPressed>() 
+            && event.getIf<sf::Event::KeyPressed>()->code == sf::Keyboard::Key::Escape) {
             nextState = AppState::Start;
         }
     }
@@ -75,6 +94,10 @@ AppState updateAndRenderMenuScreen(sf::RenderWindow& window, const std::vector<s
     ImGui::End();
 
     // 创建菜单
+    ImGui::SetNextWindowPos(ImVec2(
+        window.getSize().x * 0.5f,
+        window.getSize().y * 0.5f
+    ), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
     ImGui::Begin("菜单", nullptr, 
         ImGuiWindowFlags_AlwaysAutoResize | 
         ImGuiWindowFlags_NoCollapse | 
@@ -82,10 +105,6 @@ AppState updateAndRenderMenuScreen(sf::RenderWindow& window, const std::vector<s
         ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoBackground);
-    ImGui::SetWindowPos(ImVec2(
-        (window.getSize().x - ImGui::GetWindowWidth()) * 0.5f,
-        (window.getSize().y - ImGui::GetWindowHeight()) * 0.5f
-    ));
 
     if (ImGui::Button("故事模式", ImVec2(200, 40))) {
         // 还没有完成
@@ -103,35 +122,30 @@ AppState updateAndRenderMenuScreen(sf::RenderWindow& window, const std::vector<s
 AppState updateAndRenderPlayingScreen(sf::RenderWindow& window, const std::vector<sf::Event>& events) {
     AppState nextState = AppState::Playing;
     
-    for (const auto& event : events){
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape)){
+    for (const auto& event : events) {
+        if (event.is<sf::Event::KeyPressed>()
+            && event.getIf<sf::Event::KeyPressed>()->code == sf::Keyboard::Key::Escape) {
             nextState = AppState::Paused;
         }
     }
 
     ImGui::Begin("游戏测试面板", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     if (ImGui::Button("击杀 +1", ImVec2(120, 30))) {
-        auto& gd = DataConfig::MutGameData();
-        gd.killed_count += 1;
+        GameDataNS::g_GameData.Config().killedCount += 1;
     }
     ImGui::SameLine();
     if (ImGui::Button("结束并结算", ImVec2(120, 30))) {
         nextState = AppState::End;
     }
-    ImGui::Text("当前杀敌数: %d", DataConfig::GetGameData().killed_count);
+    ImGui::Text("当前杀敌数: %d", GameDataNS::g_GameData.GetConfig().killedCount);
     ImGui::End();
 
     return nextState;
 }
 
 // 渲染与处理暂停界面
-AppState updateAndRenderPausedScreen(sf::RenderWindow& window, const std::vector<sf::Event>& events) {
+AppState updateAndRenderPausedScreen(sf::RenderWindow& window, const std::vector<sf::Event>& /*events*/) {
     AppState nextState = AppState::Paused;
-
-    // 按 Esc 继续游戏（与 Playing 中按 Esc 进入 Pause 对应）
-    // if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Escape)) {
-    //     return AppState::Playing;
-    // }
 
     // 居中显示暂停面板
     const ImVec2 winSize(240.0f, 160.0f);
@@ -149,9 +163,8 @@ AppState updateAndRenderPausedScreen(sf::RenderWindow& window, const std::vector
     }
 
     if (ImGui::Button("重新开始", ImVec2(200, 40))) {
-        // 重置游戏数据
-        DataConfig::ResetGameData();
-        DataConfig::SaveConfig();
+        // 重置游戏数据（直接通过全局对象）
+        GameDataNS::g_GameData.ResetConfig();
         nextState = AppState::Playing; // 重新开始后直接进入游戏（如需回到准备界面改为 AppState::Start）
     }
 
@@ -187,9 +200,9 @@ AppState updateAndRenderEndScreen(sf::RenderWindow& window, const std::vector<sf
         ImGuiWindowFlags_NoCollapse |
         ImGuiWindowFlags_NoMove);
 
-    const auto& gd = DataConfig::GetGameData();
+    const auto& gd = GameDataNS::g_GameData.GetConfig();
     ImGui::Text("最终等级: %d", gd.level);
-    ImGui::Text("杀敌数: %d", gd.killed_count);
+    ImGui::Text("杀敌数: %d", gd.killedCount);
     ImGui::Separator();
     ImGui::Text("按下任意键以继续");
 
@@ -198,17 +211,7 @@ AppState updateAndRenderEndScreen(sf::RenderWindow& window, const std::vector<sf
 }
 
 int main(){
-    // 若 data.ini 不存在，先用默认值写一个文件（可选）
-    if (!std::filesystem::exists("data.ini")) {
-        std::cout << "未找到 data.ini，使用默认配置并创建 data.ini\n";
-        DataConfig::SaveConfig("data.ini"); // 创建默认配置文件
-    }
-
-    // 加载配置（若文件损坏也会回退为默认值）
-    if (!DataConfig::LoadConfig("data.ini")) {
-        std::cerr << "加载 data.ini 失败，继续使用默认配置\n";
-    }
-    const auto& disp = DataConfig::GetDisplaySettings();
+    const auto& disp = DisplayConfig::g_Display.GetSettings();
 
     // 使用配置创建窗口
     sf::State state = disp.fullscreen ? sf::State::Fullscreen : sf::State::Windowed;
@@ -223,11 +226,10 @@ int main(){
         return -1;
     }
 
-    // 从 DataConfig 获取字体路径与大小并加载字体
+    // 从 DisplayConfig 获取字体路径与大小并加载字体
     ImGuiIO& io = ImGui::GetIO();
-    const auto& cfg = DataConfig::GetDisplaySettings();
-    std::string fontPath = cfg.fontPath;
-    float fontSize = static_cast<float>(cfg.fontSize > 0 ? cfg.fontSize : 18);
+    std::string fontPath = disp.fontPath;
+    float fontSize = static_cast<float>(disp.fontSize > 0 ? disp.fontSize : 18);
 
     // 若给定路径不存在，尝试在 lib 目录下寻找（容错）
     if (!std::filesystem::exists(fontPath)) {
@@ -262,15 +264,18 @@ int main(){
 
     sf::Clock deltaClock;
     float playingSaveAccumulator = 0.f;                 // 累计在 Playing 状态下的时间（秒）
-    constexpr float AUTO_SAVE_INTERVAL = 60.f;         // 自动保存间隔：60 秒
     bool wasPlaying = false;                           // 用于检测是否刚进入 Playing 状态
+
+    // 事件容器在循环外创建，避免每帧重新分配内存
+    std::vector<sf::Event> events;
+    events.reserve(16);
 
     while (window.isOpen()) {
         // 清空屏幕
         window.clear();
 
         // 收集事件
-        std::vector<sf::Event> events;
+        events.clear();
         while (auto eventOpt = window.pollEvent()) {
             sf::Event event = *eventOpt;
             if (event.is<sf::Event::Closed>()) {
@@ -289,6 +294,9 @@ int main(){
             case AppState::Start:
                 // 启动界面
                 appstate = updateAndRenderStartScreen(window, events);
+                break;
+            case AppState::Setting:
+                appstate = updateAndRenderSettingScreen(window, events);
                 break;
             case AppState::Menu:
                 // 菜单界面
@@ -316,7 +324,7 @@ int main(){
             }
             playingSaveAccumulator += dt.asSeconds();
             if (playingSaveAccumulator >= AUTO_SAVE_INTERVAL) {
-                DataConfig::SaveConfig("data.ini");
+                GameDataNS::g_GameData.Save();
                 playingSaveAccumulator = 0.f;
             }
         } else {
@@ -328,7 +336,7 @@ int main(){
     }
 
     // 退出前保存当前数据
-    DataConfig::SaveConfig("data.ini");
+    GameDataNS::g_GameData.Save();
 
     ImGui::SFML::Shutdown();
     return 0;
