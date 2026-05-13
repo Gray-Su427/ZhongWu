@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <unordered_set>
+#include <vector>
 
 class Unit {
 public:
@@ -10,6 +11,15 @@ public:
         PlayerCtrl,
         EnemyCtrl,
         Neutral
+    };
+
+    // FSM（有限状态机）状态枚举，用于控制单位的战斗行为
+    enum class State {
+        Idle,       // 空闲
+        Moving,     // 移动中
+        Attacking,  // 攻击中
+        Casting,    // 施法中
+        Dead        // 已死亡
     };
 
     Unit(sf::Vector2f pos , int starRank = 1);
@@ -50,6 +60,28 @@ public:
 
     Owner owner() const;
     void setOwner(Owner o);
+
+    // --- FSM 状态接口 ---
+    // 获取当前FSM状态
+    State getState() const;
+    // 设置FSM状态
+    void setState(State s);
+
+    // --- Traits（羁绊）接口 ---
+    // 添加一个羁绊标签
+    void addTrait(const std::string& trait);
+    // 移除一个羁绊标签
+    void removeTrait(const std::string& trait);
+    // 检查是否拥有指定羁绊
+    bool hasTrait(const std::string& trait) const;
+    // 获取所有羁绊标签的集合
+    const std::unordered_set<std::string>& getTraits() const;
+
+    // --- 名称接口 ---
+    // 设置单位名称（如"战士"、"法师"等）
+    void setUnitName(const std::string& name);
+    // 获取单位名称
+    const std::string& getUnitName() const;
 
     // --- 拖拽接口（准备/布阵阶段） ---
     void startDrag(const sf::Vector2f& mousePos); // 记录原位并开启拖拽
@@ -100,6 +132,8 @@ protected:
 
     Owner m_owner = Owner::Neutral;
     std::unordered_set<std::string> m_traits;
+    State m_state = State::Idle;
+    std::string m_unitName;
 
     // 默认渲染使用一个矩形 shape
     sf::RectangleShape shape;

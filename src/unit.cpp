@@ -51,6 +51,28 @@ bool Unit::isAlive() const { return hp > 0; }
 Unit::Owner Unit::owner() const { return m_owner; }
 void Unit::setOwner(Owner o) { m_owner = o; }
 
+// --- FSM 状态 ---
+// 获取当前FSM状态
+Unit::State Unit::getState() const { return m_state; }
+// 设置FSM状态
+void Unit::setState(State s) { m_state = s; }
+
+// --- Traits（羁绊）---
+// 添加一个羁绊标签
+void Unit::addTrait(const std::string& trait) { m_traits.insert(trait); }
+// 移除一个羁绊标签
+void Unit::removeTrait(const std::string& trait) { m_traits.erase(trait); }
+// 检查是否拥有指定羁绊
+bool Unit::hasTrait(const std::string& trait) const { return m_traits.count(trait) > 0; }
+// 获取所有羁绊标签的集合
+const std::unordered_set<std::string>& Unit::getTraits() const { return m_traits; }
+
+// --- 名称 ---
+// 设置单位名称
+void Unit::setUnitName(const std::string& name) { m_unitName = name; }
+// 获取单位名称
+const std::string& Unit::getUnitName() const { return m_unitName; }
+
 // 拖拽
 void Unit::startDrag(const sf::Vector2f& mousePos) {
     dragging = true;
