@@ -1,5 +1,7 @@
 ﻿#include "unit.h"
 #include <cmath>
+#include <random>
+#include <algorithm>
 
 Unit::Unit(sf::Vector2f pos , int starRank_)
 : position(pos)
@@ -141,4 +143,80 @@ void Unit::takeDamage(int dmg) {
 void Unit::heal(int amount) {
     if (!isAlive()) return;
     setHP(hp + amount);
+}
+
+// ==================== 战斗系统方法 ====================
+
+// 重置战斗状态
+void Unit::resetCombatState() {
+    target_ = nullptr;
+    attackTimer_ = 0.f;
+    m_state = State::Idle;
+    velocity = {0.f, 0.f};
+}
+
+void Unit::setInCombat(bool v) { inCombat_ = v; }
+bool Unit::isInCombat() const { return inCombat_; }
+
+void Unit::setBoardBounds(const sf::FloatRect& bounds) { boardBounds_ = bounds; }
+const sf::FloatRect& Unit::getBoardBounds() const { return boardBounds_; }
+
+void Unit::setMoveSpeed(float s) { moveSpeed_ = s; }
+float Unit::getMoveSpeed() const { return moveSpeed_; }
+
+void Unit::setAttackSpeed(float s) { attackSpeed_ = s; }
+float Unit::getAttackSpeed() const { return attackSpeed_; }
+
+void Unit::setDodgeChance(float d) { dodgeChance_ = d; }
+float Unit::getDodgeChance() const { return dodgeChance_; }
+
+Unit* Unit::getTarget() const { return target_; }
+void Unit::setTarget(Unit* t) { target_ = t; }
+
+// 执行攻击（含闪避判定）
+void Unit::performAttack(Unit& target) {
+    if (!isAlive() || !target.isAlive()) return;
+
+    // 闪避判定
+    static std::mt19937 rng(std::random_device{}());
+    std::uniform_real_distribution<float> dist(0.f, 1.f);
+    if (dist(rng) < target.getDodgeChance()) {
+        // 闪避成功，不造成伤害
+        return;
+    }
+
+    target.takeDamage(atk);
+
+    // 攻击后增加Mana（如果有MaxMana）
+    if (maxMana > 0) {
+        mana = std::min(mana + 10, maxMana);
+    }
+}
+
+// 找最近的敌方单位
+Unit* Unit::findClosestEnemy(const std::vector<Unit*>& enemies) const {
+    Unit* closest = nullptr;
+    float closestDist = std::numeric_limits<float>::max();
+    for (auto* enemy : enemies) {
+        if (!enemy || !enemy->isAlive()) continue;
+        float dx = position.x - enemy->getPosition().x;
+        float dy = position.y - enemy->getPosition().y;
+        float dist = dx * dx + dy * dy;  // 平方距离，避免开方
+        if (dist < closestDist) {
+            closestDist = dist;
+            closest = enemy;
+        }
+    }
+    return closest;
+}
+
+// 约束位置在棋盘边界内
+void Unit::clampToBoardBounds() {
+    float halfW = size.x * 0.5f;
+    float halfH = size.y * 0.5f;
+    position.x = std::max(boardBounds_.position.x + halfW,
+                          std::min(position.x, boardBounds_.position.x + boardBounds_.size.x - halfW));
+    position.y = std::max(boardBounds_.position.y + halfH,
+                          std::min(position.y, boardBounds_.position.y + boardBounds_.size.y - halfH));
+    shape.setPosition(position);
 }

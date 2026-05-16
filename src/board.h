@@ -70,6 +70,8 @@ public:
     std::vector<Unit*> getPlayerUnitsOnBoard() const;
     // 获取棋盘上所有敌方单位
     std::vector<Unit*> getEnemyUnitsOnBoard() const;
+    // 获取棋盘上所有单位（不分阵营）
+    std::vector<Unit*> getAllUnitsOnBoard() const;
     // 获取Bench上所有单位
     std::vector<Unit*> getBenchUnits() const;
     // 获取棋盘上玩家单位数量

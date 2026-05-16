@@ -94,9 +94,43 @@ public:
     // 判断点是否在单位内（用于鼠标选中/拖拽）
     bool containsPoint(const sf::Vector2f& point) const;
 
+    // --- 序列化接口 ---
+    // 获取单位类型名称（用于序列化，如"战士"、"弓箭手"等）
+    virtual std::string getUnitTypeName() const = 0;
+
     // 核心接口(纯虚函数)
     virtual void update(float dt) = 0;
     virtual std::unique_ptr<Unit> clone() const = 0;
+
+    // --- 战斗系统接口 ---
+    // 战斗FSM更新（每帧调用，传入缩放系数）
+    virtual void updateCombat(float dt, float uniformScale) = 0;
+    // 重置战斗状态（目标、计时器、FSM状态等）
+    void resetCombatState();
+    // 设置/获取战斗模式
+    void setInCombat(bool v);
+    bool isInCombat() const;
+    // 设置棋盘像素边界（约束移动范围）
+    void setBoardBounds(const sf::FloatRect& bounds);
+    const sf::FloatRect& getBoardBounds() const;
+    // 移动速度（像素/秒）
+    void setMoveSpeed(float s);
+    float getMoveSpeed() const;
+    // 攻击间隔（秒）
+    void setAttackSpeed(float s);
+    float getAttackSpeed() const;
+    // 闪避概率
+    void setDodgeChance(float d);
+    float getDodgeChance() const;
+    // 当前攻击目标
+    Unit* getTarget() const;
+    void setTarget(Unit* t);
+    // 执行攻击（含闪避判定）
+    virtual void performAttack(Unit& target);
+    // 找最近的敌方单位
+    Unit* findClosestEnemy(const std::vector<Unit*>& enemies) const;
+    // 约束位置在棋盘边界内
+    void clampToBoardBounds();
 
     // 默认绘制实现（可被覆盖）
     virtual void render(sf::RenderWindow& window) const;
@@ -142,6 +176,15 @@ protected:
     bool dragging = false;
     sf::Vector2f dragOffset{0.f, 0.f};
     sf::Vector2f originalPosition{0.f, 0.f};
+
+    // 战斗系统属性
+    float moveSpeed_ = 150.f;           // 移动速度（像素/秒）
+    float attackSpeed_ = 1.0f;          // 攻击间隔（秒）
+    float attackTimer_ = 0.f;           // 攻击冷却计时器
+    float dodgeChance_ = 0.f;           // 闪避概率（0.0~1.0）
+    Unit* target_ = nullptr;            // 当前攻击目标（不拥有所有权）
+    bool inCombat_ = false;             // 是否处于战斗模式
+    sf::FloatRect boardBounds_;         // 棋盘像素边界（约束移动范围）
 
     // 同步 shape 到 position/size/color
     void syncShape();

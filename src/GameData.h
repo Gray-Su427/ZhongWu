@@ -1,5 +1,6 @@
 #pragma once
 #include "unit.h"
+#include "board.h"
 #include <vector>
 #include <memory>
 #include <string>
@@ -8,14 +9,28 @@ constexpr float AUTO_SAVE_INTERVAL = 60.0f;
 
 namespace GameDataNS {
 
+// 单位序列化数据（保存到 INI）
+struct UnitSaveData {
+    std::string typeName;       // 类型名称："战士"、"弓箭手"等
+    int owner = 0;              // 0=Player, 1=Enemy, 2=Neutral
+    int hp = 100;
+    int maxHp = 100;
+    int atk = 10;
+    int starRank = 1;
+    int row = -1;               // 棋盘行（-1表示在Bench上）
+    int col = -1;               // 棋盘列
+    int benchSlot = -1;         // Bench槽位（-1表示在棋盘上）
+};
+
 // 持久化游戏数据（保存到 INI）
 struct GameConfig {
     int playerHP = 100;
     int gold = 20;
-    int level = 1;
+    int round = 1;
     int killedCount = 0;
     int benchSize = 8;
     int currentStage = 1;
+    bool died = false;          // 是否因死亡结束上一局
 
     /// 校验数据合法性，将非法值修正为默认值
     void validate();
@@ -62,5 +77,11 @@ private:
 };
 
 extern GameDataManager g_GameData;
+
+// 保存完整游戏状态（含棋盘单位）到INI
+bool SaveFullGame(const BoardNS::Board& board);
+
+// 从INI恢复完整游戏状态（含棋盘单位）
+bool LoadFullGame(BoardNS::Board& board);
 
 } // namespace GameDataNS

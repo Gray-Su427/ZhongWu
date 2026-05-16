@@ -1,4 +1,6 @@
 #include "game_phase.h"
+#include "game_renderer.h"
+#include "GameData.h"
 #include <algorithm>
 #include <iostream>
 
@@ -11,11 +13,9 @@ GameManager::GameManager()
 
 // --- 核心循环 ---
 
-// 每帧调用：根据当前阶段分发到对应的更新函数
 void GameManager::update(float dt) {
     switch (currentPhase_) {
         case Phase::Prep:
-            // 准备阶段等待玩家操作，不需要自动更新
             break;
         case Phase::Combat:
             updateCombat(dt);
@@ -24,19 +24,16 @@ void GameManager::update(float dt) {
             }
             break;
         case Phase::Resolve:
-            // 结算后自动进入下一轮
             break;
     }
 }
 
 // --- 阶段控制 ---
 
-// 直接设置当前游戏阶段
 void GameManager::setPhase(Phase phase) {
     currentPhase_ = phase;
 }
 
-// 推进到下一阶段：Prep→Combat→Resolve→Prep（循环）
 void GameManager::nextPhase() {
     switch (currentPhase_) {
         case Phase::Prep:
@@ -53,23 +50,18 @@ void GameManager::nextPhase() {
 
 // --- 准备阶段操作 ---
 
-// 开始新一轮：回合数+1，进入准备阶段，生成新的敌方单位
 void GameManager::startNewRound() {
     currentPhase_ = Phase::Prep;
     currentRound_++;
-    // 清除上一轮的敌方单位
-    // 保留玩家在棋盘上的单位
-    // 生成新的敌方单位
+    GameDataNS::g_GameData.Config().round = currentRound_;
     spawnEnemyUnits();
     std::cout << "第 " << currentRound_ << " 轮开始（准备阶段）" << std::endl;
 }
 
-// 生成敌方单位：清除旧敌方，在棋盘上半部分随机放置，属性随回合数缩放
 void GameManager::spawnEnemyUnits() {
     // 清除旧的敌方单位
     auto enemies = board_.getEnemyUnitsOnBoard();
     for (auto* e : enemies) {
-        // 找到并移除
         for (int r = 0; r < board_.getRows(); ++r) {
             for (int c = 0; c < board_.getCols(); ++c) {
                 BoardNS::GridPos pos{r, c};
@@ -81,14 +73,11 @@ void GameManager::spawnEnemyUnits() {
         }
     }
 
-    // 根据回合数生成敌方单位（简单递增难度）
     int numEnemies = std::min(1 + currentRound_ / 2, 5);
     std::uniform_int_distribution<int> typeDist(0, 4);
 
-    // 敌方出现在棋盘右半部分（col 4-7）
     int halfCols = board_.getCols() / 2;
     std::uniform_int_distribution<int> colDist(halfCols, board_.getCols() - 1);
-    // 行范围：全部行均可
     std::uniform_int_distribution<int> rowDist(0, board_.getRows() - 1);
 
     for (int i = 0; i < numEnemies; ++i) {
@@ -112,7 +101,6 @@ void GameManager::spawnEnemyUnits() {
                 default: enemy = std::make_unique<WarriorUnit>(); break;
             }
             enemy->setOwner(Unit::Owner::EnemyCtrl);
-            // 根据回合数增强敌方属性
             float scaleFactor = 1.0f + (currentRound_ - 1) * 0.15f;
             enemy->setMaxHP(static_cast<int>(enemy->getMaxHP() * scaleFactor));
             enemy->setHP(enemy->getMaxHP());
@@ -123,57 +111,47 @@ void GameManager::spawnEnemyUnits() {
     }
 }
 
-// 将Bench上指定槽位的单位移动到棋盘指定位置，目标非空则尝试交换
 bool GameManager::moveBenchToBoard(int benchSlot, const BoardNS::GridPos& pos) {
     if (benchSlot < 0 || board_.isBoardCellEmpty(pos) == false) {
-        // 目标格子非空，尝试交换
         return swapBenchAndBoard(benchSlot, pos);
     }
     auto unit = board_.removeFromBench(benchSlot);
     if (!unit) return false;
     if (!board_.placeOnBoard(pos, std::move(unit))) {
-        // 放置失败，放回Bench
         board_.placeOnBench(benchSlot, std::move(unit));
         return false;
     }
     return true;
 }
 
-// 将棋盘上指定位置的单位移动到Bench指定槽位
 bool GameManager::moveBoardToBench(const BoardNS::GridPos& pos, int benchSlot) {
     if (benchSlot < 0) return false;
     auto unit = board_.removeFromBoard(pos);
     if (!unit) return false;
     if (!board_.placeOnBench(benchSlot, std::move(unit))) {
-        // 放置失败，放回棋盘
         board_.placeOnBoard(pos, std::move(unit));
         return false;
     }
     return true;
 }
 
-// 在棋盘内移动单位，若目标有单位则交换两者位置
 bool GameManager::moveOnBoard(const BoardNS::GridPos& from, const BoardNS::GridPos& to) {
     if (from == to) return false;
     auto unitFrom = board_.removeFromBoard(from);
     if (!unitFrom) return false;
 
     auto unitTo = board_.removeFromBoard(to);
-    // 先放from的单位到to
     if (!board_.placeOnBoard(to, std::move(unitFrom))) {
-        // 失败，还原
         board_.placeOnBoard(from, std::move(unitFrom));
         if (unitTo) board_.placeOnBoard(to, std::move(unitTo));
         return false;
     }
-    // 如果to原来有单位，放到from（交换）
     if (unitTo) {
         board_.placeOnBoard(from, std::move(unitTo));
     }
     return true;
 }
 
-// 交换Bench槽位和棋盘位置上的单位（其中一个可以为空）
 bool GameManager::swapBenchAndBoard(int benchSlot, const BoardNS::GridPos& pos) {
     auto benchUnit = board_.removeFromBench(benchSlot);
     auto boardUnit = board_.removeFromBoard(pos);
@@ -194,99 +172,114 @@ bool GameManager::swapBenchAndBoard(int benchSlot, const BoardNS::GridPos& pos) 
 
 // --- 战斗阶段 ---
 
-// 开始战斗：切换到Combat阶段，重置计时器，将所有单位设为Idle状态
+void GameManager::setRenderer(RendererNS::GameRenderer* renderer) {
+    renderer_ = renderer;
+}
+
 void GameManager::startCombat() {
     currentPhase_ = Phase::Combat;
     combatTimer_ = 0.f;
     combatActive_ = true;
 
-    // 设置所有单位状态为Idle
-    board_.forEachBoardUnit([](const BoardNS::GridPos&, Unit* unit) {
+    // 获取渲染器布局信息
+    float uniformScale = 1.0f;
+    sf::FloatRect boardBounds({0.f, 0.f}, {512.f, 512.f});
+    if (renderer_) {
+        const auto& layout = renderer_->getLayout();
+        uniformScale = layout.uniformScale;
+        boardBounds = sf::FloatRect(
+            {layout.boardOriginX, layout.boardOriginY},
+            {layout.boardPixelW, layout.boardPixelH}
+        );
+    }
+
+    // 初始化所有棋盘单位的战斗状态
+    board_.forEachBoardUnit([&](const BoardNS::GridPos& pos, Unit* unit) {
         if (unit->isAlive()) {
-            unit->setState(Unit::State::Idle);
+            // 计算格子中心的像素坐标
+            sf::Vector2f pixelPos;
+            if (renderer_) {
+                pixelPos = renderer_->boardCellToScreen(pos);
+            } else {
+                pixelPos = sf::Vector2f(
+                    pos.col * 64.f + 32.f,
+                    pos.row * 64.f + 32.f
+                );
+            }
+            unit->setPosition(pixelPos);
+            unit->setInCombat(true);
+            unit->setBoardBounds(boardBounds);
+            unit->resetCombatState();
         }
     });
 
     std::cout << "战斗开始！" << std::endl;
 }
 
-// 更新战斗逻辑：每隔固定时间执行一轮攻击，每个单位攻击最近的敌方
 void GameManager::updateCombat(float dt) {
     if (!combatActive_) return;
 
     combatTimer_ += dt;
-    if (combatTimer_ < combatTickInterval_) return;
-    combatTimer_ -= combatTickInterval_;
+
+    // 获取缩放系数
+    float uniformScale = 1.0f;
+    if (renderer_) {
+        uniformScale = renderer_->getLayout().uniformScale;
+    }
 
     // 获取所有存活单位
-    auto playerUnits = board_.getPlayerUnitsOnBoard();
-    auto enemyUnits = board_.getEnemyUnitsOnBoard();
+    auto allUnits = board_.getAllUnitsOnBoard();
 
-    // 移除已死亡的单位
-    auto removeDead = [&](std::vector<Unit*>& units) {
-        units.erase(
-            std::remove_if(units.begin(), units.end(),
-                [](Unit* u) { return !u->isAlive(); }),
-            units.end());
-    };
-    removeDead(playerUnits);
-    removeDead(enemyUnits);
-
-    // 每个玩家单位攻击一个敌方单位
-    for (auto* attacker : playerUnits) {
-        if (!attacker->isAlive()) continue;
-        if (enemyUnits.empty()) break;
-
-        // 找最近的敌方单位
-        Unit* closest = nullptr;
-        float closestDist = std::numeric_limits<float>::max();
-        for (auto* target : enemyUnits) {
-            if (!target->isAlive()) continue;
-            float dist = std::hypot(
-                attacker->getPosition().x - target->getPosition().x,
-                attacker->getPosition().y - target->getPosition().y);
-            if (dist < closestDist) {
-                closestDist = dist;
-                closest = target;
-            }
-        }
-        if (closest) {
-            attacker->setState(Unit::State::Attacking);
-            attacker->attack(*closest);
+    // 分阵营
+    std::vector<Unit*> playerUnits;
+    std::vector<Unit*> enemyUnits;
+    for (auto* u : allUnits) {
+        if (!u->isAlive()) continue;
+        if (u->owner() == Unit::Owner::PlayerCtrl) {
+            playerUnits.push_back(u);
+        } else if (u->owner() == Unit::Owner::EnemyCtrl) {
+            enemyUnits.push_back(u);
         }
     }
 
-    // 每个敌方单位攻击一个玩家单位
-    for (auto* attacker : enemyUnits) {
-        if (!attacker->isAlive()) continue;
-        if (playerUnits.empty()) break;
+    // 为每个单位分配目标（找最近的敌方）
+    for (auto* unit : allUnits) {
+        if (!unit->isAlive()) continue;
 
-        Unit* closest = nullptr;
-        float closestDist = std::numeric_limits<float>::max();
-        for (auto* target : playerUnits) {
-            if (!target->isAlive()) continue;
-            float dist = std::hypot(
-                attacker->getPosition().x - target->getPosition().x,
-                attacker->getPosition().y - target->getPosition().y);
-            if (dist < closestDist) {
-                closestDist = dist;
-                closest = target;
+        // 检查当前目标是否仍然有效
+        Unit* currentTarget = unit->getTarget();
+        if (!currentTarget || !currentTarget->isAlive()) {
+            // 需要重新寻找目标
+            if (unit->owner() == Unit::Owner::PlayerCtrl) {
+                unit->setTarget(unit->findClosestEnemy(enemyUnits));
+            } else if (unit->owner() == Unit::Owner::EnemyCtrl) {
+                unit->setTarget(unit->findClosestEnemy(playerUnits));
             }
         }
-        if (closest) {
-            attacker->setState(Unit::State::Attacking);
-            attacker->attack(*closest);
+
+        // 更新战斗FSM
+        unit->updateCombat(dt, uniformScale);
+
+        // 法师AOE处理：如果法师进入Casting状态，执行AOE
+        if (unit->getState() == Unit::State::Casting && unit->hasTrait("法师")) {
+            auto* mage = dynamic_cast<MageUnit*>(unit);
+            if (mage) {
+                if (unit->owner() == Unit::Owner::PlayerCtrl) {
+                    mage->castAOE(enemyUnits, uniformScale);
+                } else {
+                    mage->castAOE(playerUnits, uniformScale);
+                }
+            }
         }
     }
-
-    // 更新所有单位
-    board_.forEachBoardUnit([dt](const BoardNS::GridPos&, Unit* unit) {
-        unit->update(dt);
-    });
 }
 
-// 检查战斗是否结束：玩家方或敌方任一全灭则结束
 bool GameManager::isCombatOver() const {
+    // 超时判定
+    if (combatTimer_ >= combatMaxTime_) {
+        return true;
+    }
+
     auto playerUnits = board_.getPlayerUnitsOnBoard();
     auto enemyUnits = board_.getEnemyUnitsOnBoard();
 
@@ -305,7 +298,6 @@ bool GameManager::isCombatOver() const {
 
 // --- 结算阶段 ---
 
-// 结算本轮：判断胜负，失败扣HP，清除敌方单位，恢复玩家单位血量
 void GameManager::resolveRound() {
     currentPhase_ = Phase::Resolve;
     combatActive_ = false;
@@ -326,14 +318,30 @@ void GameManager::resolveRound() {
     if (!enemyAlive) {
         std::cout << "第 " << currentRound_ << " 轮：胜利！" << std::endl;
     } else {
-        // 玩家失败，扣除HP
         int damage = 10;
         playerHP_ -= damage;
         std::cout << "第 " << currentRound_ << " 轮：失败！扣除 " << damage << " HP" << std::endl;
     }
 
-    // 清除死亡的单位和所有敌方单位
-    // 清除敌方
+    // 将玩家单位的像素位置映射回最近的格子
+    if (renderer_) {
+        board_.forEachBoardUnit([&](const BoardNS::GridPos& pos, Unit* unit) {
+            if (unit->owner() == Unit::Owner::PlayerCtrl && unit->isAlive()) {
+                // 找到最近的空格子
+                sf::Vector2f pixelPos = unit->getPosition();
+                BoardNS::GridPos nearestPos = renderer_->screenToBoardCell(pixelPos);
+                if (nearestPos.isValid() && nearestPos != pos) {
+                    // 如果目标格子为空或就是自己，移动
+                    if (board_.isBoardCellEmpty(nearestPos)) {
+                        auto unitPtr = board_.removeFromBoard(pos);
+                        board_.placeOnBoard(nearestPos, std::move(unitPtr));
+                    }
+                }
+            }
+        });
+    }
+
+    // 清除敌方单位
     for (int r = 0; r < board_.getRows(); ++r) {
         for (int c = 0; c < board_.getCols(); ++c) {
             BoardNS::GridPos pos{r, c};
@@ -344,20 +352,58 @@ void GameManager::resolveRound() {
         }
     }
 
-    // 恢复玩家单位HP（阶段一简化处理）
-    board_.forEachBoardUnit([](const BoardNS::GridPos&, Unit* unit) {
+    // 恢复玩家单位HP，重置战斗状态
+    board_.forEachBoardUnit([](const BoardNS::GridPos& pos, Unit* unit) {
         if (unit->owner() == Unit::Owner::PlayerCtrl) {
             unit->setHP(unit->getMaxHP());
             unit->setState(Unit::State::Idle);
+            unit->setInCombat(false);
+            unit->resetCombatState();
+            // 重置位置到格子中心（由渲染器在下一帧处理）
         }
     });
 }
 
+// --- 存档相关 ---
+
+void GameManager::saveToGameData() {
+    auto& config = GameDataNS::g_GameData.Config();
+    config.playerHP = playerHP_;
+    config.round = currentRound_;
+    config.died = false;
+
+    int boardCount = 0, benchCount = 0;
+    board_.forEachBoardUnit([&](const BoardNS::GridPos&, Unit*) { boardCount++; });
+    for (int i = 0; i < board_.getBenchSize(); ++i) {
+        if (board_.getUnitOnBench(i)) benchCount++;
+    }
+    std::cout << "[saveToGameData] 保存: round=" << currentRound_
+              << " playerHP=" << playerHP_
+              << " 棋盘单位=" << boardCount
+              << " Bench单位=" << benchCount << std::endl;
+
+    bool ok = GameDataNS::SaveFullGame(board_);
+    std::cout << "[saveToGameData] SaveFullGame " << (ok ? "成功" : "失败") << std::endl;
+}
+
+void GameManager::restoreFromSave() {
+    auto& config = GameDataNS::g_GameData.GetConfig();
+    playerHP_ = config.playerHP;
+    currentRound_ = config.round;
+    currentPhase_ = Phase::Prep;
+    combatActive_ = false;
+    combatTimer_ = 0.f;
+
+    bool ok = GameDataNS::LoadFullGame(board_);
+    std::cout << "[restoreFromSave] LoadFullGame " << (ok ? "成功" : "失败")
+              << " round=" << currentRound_ << " playerHP=" << playerHP_ << std::endl;
+
+    spawnEnemyUnits();
+}
+
 // --- 调试用 ---
 
-// 添加5种测试单位到Bench并生成初始敌方单位
 void GameManager::addTestUnits() {
-    // 添加一些测试单位到Bench
     auto w = std::make_unique<WarriorUnit>();
     w->setOwner(Unit::Owner::PlayerCtrl);
     board_.placeOnBench(board_.findEmptyBenchSlot(), std::move(w));
@@ -378,7 +424,6 @@ void GameManager::addTestUnits() {
     as->setOwner(Unit::Owner::PlayerCtrl);
     board_.placeOnBench(board_.findEmptyBenchSlot(), std::move(as));
 
-    // 生成初始敌方
     spawnEnemyUnits();
 }
 

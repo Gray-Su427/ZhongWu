@@ -4,6 +4,9 @@
 #include <memory>
 #include <random>
 
+// 前向声明，避免循环依赖
+namespace RendererNS { class GameRenderer; }
+
 namespace GamePhaseNS {
 
 // 游戏阶段枚举
@@ -45,12 +48,14 @@ public:
     bool swapBenchAndBoard(int benchSlot, const BoardNS::GridPos& pos);
 
     // --- 战斗阶段 ---
-    // 开始战斗，初始化所有单位状态为Idle
+    // 开始战斗，初始化所有单位像素位置和战斗状态
     void startCombat();
-    // 每帧更新战斗逻辑（每隔combatTickInterval_秒执行一次攻击轮）
+    // 每帧更新战斗逻辑（实时FSM，每帧调用各单位updateCombat）
     void updateCombat(float dt);
-    // 检查战斗是否结束（一方全灭）
+    // 检查战斗是否结束（一方全灭或超时）
     bool isCombatOver() const;
+    // 设置渲染器引用（用于获取布局信息）
+    void setRenderer(RendererNS::GameRenderer* renderer);
 
     // --- 结算阶段 ---
     // 结算本轮结果：判断胜负，失败则扣除玩家HP，清除敌方单位，恢复玩家单位
@@ -69,6 +74,12 @@ public:
     // 设置玩家HP
     void setPlayerHP(int hp) { playerHP_ = hp; }
 
+    // --- 存档相关 ---
+    // 将当前游戏状态保存到 GameData（含棋盘单位）
+    void saveToGameData();
+    // 从 GameData 恢复游戏状态（含棋盘单位）
+    void restoreFromSave();
+
     // --- 调试用 ---
     // 添加5种测试单位到Bench并生成初始敌方
     void addTestUnits();
@@ -80,9 +91,10 @@ private:
     int playerHP_ = 100;            // 玩家HP
 
     // 战斗相关
-    float combatTimer_ = 0.f;       // 战斗计时器
-    float combatTickInterval_ = 1.0f;  // 攻击间隔（秒）
+    float combatTimer_ = 0.f;       // 战斗计时器（已用时间）
+    float combatMaxTime_ = 60.f;    // 战斗超时时间（秒）
     bool combatActive_ = false;     // 战斗是否进行中
+    RendererNS::GameRenderer* renderer_ = nullptr;  // 渲染器引用（获取布局信息）
 
     // 随机数生成器（用于敌方生成）
     std::mt19937 rng_;

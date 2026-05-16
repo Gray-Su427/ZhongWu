@@ -110,6 +110,19 @@ std::vector<Unit*> Board::getEnemyUnitsOnBoard() const {
     return result;
 }
 
+// 获取棋盘上所有单位（不分阵营）
+std::vector<Unit*> Board::getAllUnitsOnBoard() const {
+    std::vector<Unit*> result;
+    for (int r = 0; r < rows_; ++r) {
+        for (int c = 0; c < cols_; ++c) {
+            if (grid_[r][c]) {
+                result.push_back(grid_[r][c].get());
+            }
+        }
+    }
+    return result;
+}
+
 // 获取Bench上所有单位的指针列表
 std::vector<Unit*> Board::getBenchUnits() const {
     std::vector<Unit*> result;

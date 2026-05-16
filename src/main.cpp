@@ -26,6 +26,7 @@ enum class AppState {
 static GamePhaseNS::GameManager g_gameManager;     // 游戏管理器（阶段控制、战斗逻辑）
 static RendererNS::GameRenderer g_renderer;        // 渲染器（棋盘绘制、坐标转换）
 static bool g_gameInitialized = false;             // 游戏是否已初始化（防止重复初始化）
+static bool g_showContinueDialog = false;          // 是否显示"继续游戏/新游戏"选择框
 
 // ==================== 拖拽状态 ====================
 // 管理玩家拖拽单位的完整生命周期：按下→移动→释放
@@ -45,12 +46,12 @@ struct DragState {
 static DragState g_drag;
 
 // ==================== 初始化游戏 ====================
-// 首次进入游戏时调用，添加测试单位到Bench并生成初始敌方
+// 新游戏时调用：重置管理器，添加测试单位到Bench并生成初始敌方
 static void initGame() {
-    if (!g_gameInitialized) {
-        g_gameManager.addTestUnits();
-        g_gameInitialized = true;
-    }
+    g_gameManager = GamePhaseNS::GameManager();
+    g_gameManager.setRenderer(&g_renderer);
+    g_gameManager.addTestUnits();
+    g_gameInitialized = true;
 }
 
 // ==================== 渲染与处理启动界面 ====================
@@ -142,10 +143,49 @@ AppState updateAndRenderMenuScreen(sf::RenderWindow& window, const std::vector<s
         // 还没有完成
     }
     if (ImGui::Button("无尽模式", ImVec2(200, 40))) {
-        initGame();
-        nextState = AppState::Playing; 
+        // 检查是否有存档且未死亡
+        if (!GameDataNS::g_GameData.GetConfig().died &&
+            GameDataNS::g_GameData.GetConfig().round > 1) {
+            g_showContinueDialog = true;
+        } else {
+            // 没有存档或已死亡，直接新游戏
+            initGame();
+            nextState = AppState::Playing;
+        }
     }
     ImGui::End();
+
+    // 继续游戏/新游戏选择框
+    if (g_showContinueDialog) {
+        ImGui::OpenPopup("选择游戏模式");
+        ImVec2 center = ImVec2(window.getSize().x * 0.5f, window.getSize().y * 0.5f);
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        if (ImGui::BeginPopupModal("选择游戏模式", nullptr,
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)) {
+            ImGui::Text("检测到存档：第 %d 轮", GameDataNS::g_GameData.GetConfig().round);
+            ImGui::Text("玩家HP: %d", GameDataNS::g_GameData.GetConfig().playerHP);
+            ImGui::Separator();
+            if (ImGui::Button("继续游戏", ImVec2(200, 40))) {
+                g_gameManager.restoreFromSave();
+                g_gameInitialized = true;
+                g_showContinueDialog = false;
+                nextState = AppState::Playing;
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::Button("新游戏", ImVec2(200, 40))) {
+                GameDataNS::g_GameData.ResetConfig();
+                initGame();
+                g_showContinueDialog = false;
+                nextState = AppState::Playing;
+                ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::Button("取消", ImVec2(200, 40))) {
+                g_showContinueDialog = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+    }
 
     return nextState;
 }
@@ -343,7 +383,7 @@ AppState updateAndRenderPlayingScreen(sf::RenderWindow& window, const std::vecto
         case GamePhaseNS::Phase::Combat: phaseStr = "战斗阶段"; break;
         case GamePhaseNS::Phase::Resolve:phaseStr = "结算阶段"; break;
     }
-    ImGui::Text("第 %d 轮 - %s", g_gameManager.getCurrentRound(), phaseStr);
+    ImGui::Text("第 %d 轮 - %s", GameDataNS::g_GameData.Config().round, phaseStr);
     ImGui::Text("玩家HP: %d", g_gameManager.getPlayerHP());
     ImGui::Separator();
 
@@ -389,10 +429,7 @@ AppState updateAndRenderPlayingScreen(sf::RenderWindow& window, const std::vecto
             }
         }
         if (ImGui::Button("重置游戏")) {
-            board.clearAll();
-            g_gameManager = GamePhaseNS::GameManager();
-            g_gameManager.addTestUnits();
-            g_gameInitialized = true;
+            initGame();
         }
         ImGui::Text("窗口: %u x %u", window.getSize().x, window.getSize().y);
         ImGui::Text("缩放: %.2f", g_renderer.getLayout().uniformScale);
@@ -432,13 +469,14 @@ AppState updateAndRenderPausedScreen(sf::RenderWindow& window, const std::vector
     }
 
     if (ImGui::Button("重新开始", ImVec2(200, 40))) {
-        g_gameManager = GamePhaseNS::GameManager();
-        g_gameManager.addTestUnits();
+        initGame();
         g_drag.reset();
         nextState = AppState::Playing;
     }
 
     if (ImGui::Button("退出", ImVec2(200, 40))) {
+        // 退出前保存完整游戏状态
+        g_gameManager.saveToGameData();
         nextState = AppState::Start;
     }
 
@@ -451,8 +489,17 @@ AppState updateAndRenderPausedScreen(sf::RenderWindow& window, const std::vector
 AppState updateAndRenderEndScreen(sf::RenderWindow& window, const std::vector<sf::Event>& events) {
     AppState nextState = AppState::End;
 
+    // 标记死亡并保存
+    static bool deathSaved = false;
+    if (!deathSaved) {
+        GameDataNS::g_GameData.Config().died = true;
+        g_gameManager.saveToGameData();
+        deathSaved = true;
+    }
+
     for (const auto& e : events) {
         if (e.is<sf::Event::KeyPressed>() || e.is<sf::Event::MouseButtonPressed>()) {
+            deathSaved = false;
             nextState = AppState::Start;
             return nextState;
         }
@@ -468,7 +515,7 @@ AppState updateAndRenderEndScreen(sf::RenderWindow& window, const std::vector<sf
         ImGuiWindowFlags_NoCollapse |
         ImGuiWindowFlags_NoMove);
 
-    ImGui::Text("最终回合: %d", g_gameManager.getCurrentRound());
+    ImGui::Text("最终回合: %d", GameDataNS::g_GameData.Config().round);
     ImGui::Text("玩家HP: %d", g_gameManager.getPlayerHP());
     ImGui::Separator();
     ImGui::Text("按下任意键以继续");
@@ -591,7 +638,7 @@ int main(){
             }
             playingSaveAccumulator += dt.asSeconds();
             if (playingSaveAccumulator >= AUTO_SAVE_INTERVAL) {
-                GameDataNS::g_GameData.Save();
+                g_gameManager.saveToGameData();
                 playingSaveAccumulator = 0.f;
             }
         } else {
@@ -602,7 +649,12 @@ int main(){
         window.display();
     }
 
-    GameDataNS::g_GameData.Save();
+    // 退出程序前保存完整游戏状态
+    if (g_gameInitialized) {
+        g_gameManager.saveToGameData();
+    } else {
+        GameDataNS::g_GameData.Save();
+    }
 
     ImGui::SFML::Shutdown();
     return 0;

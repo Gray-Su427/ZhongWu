@@ -231,9 +231,25 @@ void GameRenderer::renderUnits(sf::RenderWindow& window, const BoardNS::Board& b
     float cs = layout_.cellSize;
 
     board.forEachBoardUnit([&](const BoardNS::GridPos& pos, Unit* unit) {
-        float cx = layout_.boardOriginX + pos.col * cs + cs * 0.5f;
-        float cy = layout_.boardOriginY + pos.row * cs + cs * 0.5f;
-        drawUnitOnCell(window, unit, cx, cy, cs);
+        if (unit->isInCombat()) {
+            // 战斗模式：使用单位自身的像素位置
+            sf::Vector2f pixelPos = unit->getPosition();
+            drawUnitOnCell(window, unit, pixelPos.x, pixelPos.y, cs);
+
+            // 死亡单位半透明
+            if (!unit->isAlive()) {
+                sf::RectangleShape deadOverlay({cs * 0.7f, cs * 0.7f});
+                deadOverlay.setOrigin({cs * 0.35f, cs * 0.35f});
+                deadOverlay.setPosition(pixelPos);
+                deadOverlay.setFillColor(sf::Color(0, 0, 0, 150));
+                window.draw(deadOverlay);
+            }
+        } else {
+            // 非战斗模式：使用格子坐标计算像素位置
+            float cx = layout_.boardOriginX + pos.col * cs + cs * 0.5f;
+            float cy = layout_.boardOriginY + pos.row * cs + cs * 0.5f;
+            drawUnitOnCell(window, unit, cx, cy, cs);
+        }
     });
 
     float bcs = layout_.benchCellSize;
