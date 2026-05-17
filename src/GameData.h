@@ -22,6 +22,13 @@ struct UnitSaveData {
     int benchSlot = -1;         // Bench槽位（-1表示在棋盘上）
 };
 
+// 商店槽位序列化数据
+struct ShopSlotSaveData {
+    std::string unitTypeName;   // 单位类型名称（空字符串表示空）
+    int cost = 0;               // 价格
+    bool sold = false;          // 是否已售出
+};
+
 // 持久化游戏数据（保存到 INI）
 struct GameConfig {
     int playerHP = 100;
@@ -78,10 +85,8 @@ private:
 
 extern GameDataManager g_GameData;
 
-// 保存完整游戏状态（含棋盘单位）到INI
+// 保存/恢复完整游戏状态（含棋盘单位）到INI
 bool SaveFullGame(const BoardNS::Board& board);
-
-// 从INI恢复完整游戏状态（含棋盘单位）
 bool LoadFullGame(BoardNS::Board& board);
 
 } // namespace GameDataNS

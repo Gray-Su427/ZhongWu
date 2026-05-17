@@ -1,6 +1,7 @@
 #include "GameData.h"
 #include "unit_types.h"
 #include "board.h"
+#include "shop.h"
 #include "SimpleIni.h"
 #include <iostream>
 #include <filesystem>
@@ -11,6 +12,7 @@ namespace GameDataNS {
 static const char* SECTION_GAME = "Game";
 static const char* SECTION_BOARD = "Board";
 static const char* SECTION_BENCH = "Bench";
+static const char* SECTION_SHOP = "Shop";
 
 // ---- GameConfig ----
 

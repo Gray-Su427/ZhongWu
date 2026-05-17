@@ -54,8 +54,17 @@ void GameManager::startNewRound() {
     currentPhase_ = Phase::Prep;
     currentRound_++;
     GameDataNS::g_GameData.Config().round = currentRound_;
+
+    // 结算收入：基础收入 + 利息
+    int income = calculateIncome(false);
+    addGold(income);
+
+    // 自动刷新商店
+    freeRefreshShop();
+
     spawnEnemyUnits();
-    std::cout << "第 " << currentRound_ << " 轮开始（准备阶段）" << std::endl;
+    std::cout << "第 " << currentRound_ << " 轮开始（准备阶段），收入: " << income
+              << " 金币，当前金币: " << gold_ << std::endl;
 }
 
 void GameManager::spawnEnemyUnits() {
@@ -316,7 +325,9 @@ void GameManager::resolveRound() {
     }
 
     if (!enemyAlive) {
-        std::cout << "第 " << currentRound_ << " 轮：胜利！" << std::endl;
+        // 胜利奖励：+1金币
+        addGold(1);
+        std::cout << "第 " << currentRound_ << " 轮：胜利！+1金币（当前: " << gold_ << "）" << std::endl;
     } else {
         int damage = 10;
         playerHP_ -= damage;
@@ -364,12 +375,83 @@ void GameManager::resolveRound() {
     });
 }
 
+// --- 经济系统 ---
+
+void GameManager::addGold(int amount) {
+    gold_ += amount;
+    if (gold_ < 0) gold_ = 0;
+}
+
+bool GameManager::spendGold(int amount) {
+    if (gold_ < amount) return false;
+    gold_ -= amount;
+    return true;
+}
+
+int GameManager::calculateIncome(bool wonLastRound) const {
+    // 基础收入：5金币
+    int income = 5;
+    // 利息：每10金币+1，最多+5
+    int interest = std::min(gold_ / 10, 5);
+    income += interest;
+    // 胜利奖励：+1金币
+    if (wonLastRound) {
+        income += 1;
+    }
+    return income;
+}
+
+// --- 商店系统 ---
+
+bool GameManager::buyFromShop(int slotIndex) {
+    // 检查槽位是否有效且有可购买单位
+    if (!shop_.isSlotAvailable(slotIndex)) return false;
+
+    // 检查金币是否足够
+    int cost = shop_.getSlotCost(slotIndex);
+    if (gold_ < cost) return false;
+
+    // 检查Bench是否有空位
+    int benchSlot = board_.findEmptyBenchSlot();
+    if (benchSlot < 0) return false;
+
+    // 购买单位
+    auto unit = shop_.buyUnit(slotIndex);
+    if (!unit) return false;
+
+    // 扣除金币
+    gold_ -= cost;
+
+    // 设置为玩家单位
+    unit->setOwner(Unit::Owner::PlayerCtrl);
+
+    // 放入Bench
+    board_.placeOnBench(benchSlot, std::move(unit));
+
+    std::cout << "购买 " << shop_.getSlot(slotIndex).unitTypeName
+              << "（-" << cost << "金币），剩余金币: " << gold_ << std::endl;
+    return true;
+}
+
+bool GameManager::refreshShop() {
+    // 手动刷新花费2金币
+    if (!spendGold(2)) return false;
+    shop_.refresh();
+    std::cout << "刷新商店（-2金币），剩余金币: " << gold_ << std::endl;
+    return true;
+}
+
+void GameManager::freeRefreshShop() {
+    shop_.refresh();
+}
+
 // --- 存档相关 ---
 
 void GameManager::saveToGameData() {
     auto& config = GameDataNS::g_GameData.Config();
     config.playerHP = playerHP_;
     config.round = currentRound_;
+    config.gold = gold_;
     config.died = false;
 
     int boardCount = 0, benchCount = 0;
@@ -379,6 +461,7 @@ void GameManager::saveToGameData() {
     }
     std::cout << "[saveToGameData] 保存: round=" << currentRound_
               << " playerHP=" << playerHP_
+              << " gold=" << gold_
               << " 棋盘单位=" << boardCount
               << " Bench单位=" << benchCount << std::endl;
 
@@ -389,6 +472,7 @@ void GameManager::saveToGameData() {
 void GameManager::restoreFromSave() {
     auto& config = GameDataNS::g_GameData.GetConfig();
     playerHP_ = config.playerHP;
+    gold_ = config.gold;
     currentRound_ = config.round;
     currentPhase_ = Phase::Prep;
     combatActive_ = false;
@@ -396,8 +480,11 @@ void GameManager::restoreFromSave() {
 
     bool ok = GameDataNS::LoadFullGame(board_);
     std::cout << "[restoreFromSave] LoadFullGame " << (ok ? "成功" : "失败")
-              << " round=" << currentRound_ << " playerHP=" << playerHP_ << std::endl;
+              << " round=" << currentRound_ << " playerHP=" << playerHP_
+              << " gold=" << gold_ << std::endl;
 
+    // 刷新商店
+    freeRefreshShop();
     spawnEnemyUnits();
 }
 

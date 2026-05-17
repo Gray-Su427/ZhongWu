@@ -1,6 +1,7 @@
 #pragma once
 #include "board.h"
 #include "unit_types.h"
+#include "shop.h"
 #include <memory>
 #include <random>
 
@@ -74,10 +75,34 @@ public:
     // 设置玩家HP
     void setPlayerHP(int hp) { playerHP_ = hp; }
 
+    // --- 经济系统 ---
+    // 获取玩家当前金币
+    int getGold() const { return gold_; }
+    // 设置玩家金币
+    void setGold(int gold) { gold_ = gold; }
+    // 增加金币（收入、奖励等）
+    void addGold(int amount);
+    // 花费金币（购买等），返回是否成功（余额不足返回false）
+    bool spendGold(int amount);
+    // 计算本轮收入：基础收入5 + 利息(每10金+1, 最多+5) + 胜利奖励
+    int calculateIncome(bool wonLastRound) const;
+
+    // --- 商店系统 ---
+    // 获取商店引用（只读）
+    const ShopNS::Shop& getShop() const { return shop_; }
+    // 获取商店引用（可修改）
+    ShopNS::Shop& getShop() { return shop_; }
+    // 从商店购买单位到Bench（扣金币+创建单位+放入Bench），返回是否成功
+    bool buyFromShop(int slotIndex);
+    // 手动刷新商店（花费2金币），返回是否成功
+    bool refreshShop();
+    // 自动刷新商店（免费，每轮开始时调用）
+    void freeRefreshShop();
+
     // --- 存档相关 ---
-    // 将当前游戏状态保存到 GameData（含棋盘单位）
+    // 将当前游戏状态保存到 GameData（含棋盘单位、金币、商店）
     void saveToGameData();
-    // 从 GameData 恢复游戏状态（含棋盘单位）
+    // 从 GameData 恢复游戏状态（含棋盘单位、金币、商店）
     void restoreFromSave();
 
     // --- 调试用 ---
@@ -89,6 +114,10 @@ private:
     Phase currentPhase_ = Phase::Prep;  // 当前游戏阶段
     int currentRound_ = 1;          // 当前回合数
     int playerHP_ = 100;            // 玩家HP
+    int gold_ = 20;                 // 玩家金币
+
+    // 商店
+    ShopNS::Shop shop_;             // 商店实例
 
     // 战斗相关
     float combatTimer_ = 0.f;       // 战斗计时器（已用时间）

@@ -50,6 +50,8 @@ static DragState g_drag;
 static void initGame() {
     g_gameManager = GamePhaseNS::GameManager();
     g_gameManager.setRenderer(&g_renderer);
+    g_gameManager.setGold(20);
+    g_gameManager.freeRefreshShop();
     g_gameManager.addTestUnits();
     g_gameInitialized = true;
 }
@@ -385,6 +387,7 @@ AppState updateAndRenderPlayingScreen(sf::RenderWindow& window, const std::vecto
     }
     ImGui::Text("第 %d 轮 - %s", GameDataNS::g_GameData.Config().round, phaseStr);
     ImGui::Text("玩家HP: %d", g_gameManager.getPlayerHP());
+    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.0f, 1.0f), "金币: %d", g_gameManager.getGold());
     ImGui::Separator();
 
     // 准备阶段操作
@@ -394,6 +397,59 @@ AppState updateAndRenderPlayingScreen(sf::RenderWindow& window, const std::vecto
         }
         ImGui::Text("场上: %d 个单位", board.getPlayerUnitCountOnBoard());
         ImGui::Text("Bench: %d 个单位", board.getBenchUnitCount());
+
+        // --- 商店区域 ---
+        ImGui::Separator();
+        ImGui::Text("商店");
+
+        const auto& shop = g_gameManager.getShop();
+        bool benchFull = (board.findEmptyBenchSlot() < 0);
+
+        for (int i = 0; i < shop.getSlotCount(); ++i) {
+            const auto& slot = shop.getSlot(i);
+            ImGui::PushID(i);
+
+            if (slot.isAvailable()) {
+                // 显示单位名称和价格
+                std::string label = slot.unitTypeName + " (" + std::to_string(slot.cost) + "金)";
+
+                bool canBuy = (g_gameManager.getGold() >= slot.cost) && !benchFull;
+                if (!canBuy) {
+                    ImGui::BeginDisabled();
+                }
+
+                if (ImGui::Button(label.c_str(), ImVec2(200, 30))) {
+                    g_gameManager.buyFromShop(i);
+                }
+
+                if (!canBuy) {
+                    ImGui::EndDisabled();
+                }
+            } else {
+                // 已售出或空槽位
+                ImGui::BeginDisabled();
+                ImGui::Button("已售出", ImVec2(200, 30));
+                ImGui::EndDisabled();
+            }
+
+            ImGui::PopID();
+        }
+
+        // 刷新商店按钮
+        bool canRefresh = g_gameManager.getGold() >= 2;
+        if (!canRefresh) {
+            ImGui::BeginDisabled();
+        }
+        if (ImGui::Button("刷新商店 (2金)", ImVec2(200, 30))) {
+            g_gameManager.refreshShop();
+        }
+        if (!canRefresh) {
+            ImGui::EndDisabled();
+        }
+
+        if (benchFull) {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Bench已满，无法购买");
+        }
     }
 
     // 战斗阶段信息
