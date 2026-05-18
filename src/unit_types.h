@@ -35,9 +35,10 @@ public:
     std::string getUnitTypeName() const override { return "法师"; }
     void update(float dt) override;
     void updateCombat(float dt, float uniformScale) override;
-    void performAttack(Unit& target) override;  // 法师攻击增加Mana
+    void performAttack(Unit& target, int atkBonus = 0, float critBonus = 0.f) override;  // 法师攻击增加Mana
     // AOE技能：对目标周围所有敌方造成伤害
-    void castAOE(const std::vector<Unit*>& enemies, float uniformScale);
+    // aoeMultiplier: 羁绊提供的AOE伤害倍率加成
+    void castAOE(const std::vector<Unit*>& enemies, float uniformScale, float aoeMultiplier = 0.f);
     std::unique_ptr<Unit> clone() const override;
 };
 
@@ -59,6 +60,6 @@ public:
     std::string getUnitTypeName() const override { return "刺客"; }
     void update(float dt) override;
     void updateCombat(float dt, float uniformScale) override;
-    void performAttack(Unit& target) override;  // 刺客暴击
+    void performAttack(Unit& target, int atkBonus = 0, float critBonus = 0.f) override;  // 刺客暴击
     std::unique_ptr<Unit> clone() const override;
 };

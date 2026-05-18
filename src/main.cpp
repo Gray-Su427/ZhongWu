@@ -168,6 +168,7 @@ AppState updateAndRenderMenuScreen(sf::RenderWindow& window, const std::vector<s
             ImGui::Text("玩家HP: %d", GameDataNS::g_GameData.GetConfig().playerHP);
             ImGui::Separator();
             if (ImGui::Button("继续游戏", ImVec2(200, 40))) {
+                g_gameManager.setRenderer(&g_renderer);
                 g_gameManager.restoreFromSave();
                 g_gameInitialized = true;
                 g_showContinueDialog = false;
@@ -397,6 +398,30 @@ AppState updateAndRenderPlayingScreen(sf::RenderWindow& window, const std::vecto
         }
         ImGui::Text("场上: %d 个单位", board.getPlayerUnitCountOnBoard());
         ImGui::Text("Bench: %d 个单位", board.getBenchUnitCount());
+
+        // --- 羁绊信息区域 ---
+        ImGui::Separator();
+        g_gameManager.recalculateSynergies();
+        const auto& synergies = g_gameManager.getSynergyManager().getActiveSynergies();
+        bool hasActive = false;
+        for (const auto& s : synergies) {
+            if (s.level > 0) {
+                hasActive = true;
+                break;
+            }
+        }
+        if (hasActive) {
+            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.8f, 1.0f), "激活羁绊:");
+            for (const auto& s : synergies) {
+                if (s.level > 0) {
+                    ImGui::Text("  %s x%d [%d]", s.traitName.c_str(), s.count, s.level);
+                    ImGui::SameLine();
+                    ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.4f, 1.0f), "%s", s.buffDescription.c_str());
+                }
+            }
+        } else {
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "暂无激活羁绊");
+        }
 
         // --- 商店区域 ---
         ImGui::Separator();

@@ -2,6 +2,7 @@
 #include "board.h"
 #include "unit_types.h"
 #include "shop.h"
+#include "synergy.h"
 #include <memory>
 #include <random>
 
@@ -105,6 +106,14 @@ public:
     // 从 GameData 恢复游戏状态（含棋盘单位、金币、商店）
     void restoreFromSave();
 
+    // --- 羁绊系统 ---
+    // 获取羁绊管理器引用（只读）
+    const SynergyNS::SynergyManager& getSynergyManager() const { return synergyMgr_; }
+    // 获取羁绊管理器引用（可修改）
+    SynergyNS::SynergyManager& getSynergyManager() { return synergyMgr_; }
+    // 计算当前场上羁绊（准备阶段可随时调用，用于GUI显示）
+    void recalculateSynergies();
+
     // --- 调试用 ---
     // 添加5种测试单位到Bench并生成初始敌方
     void addTestUnits();
@@ -118,6 +127,9 @@ private:
 
     // 商店
     ShopNS::Shop shop_;             // 商店实例
+
+    // 羁绊系统
+    SynergyNS::SynergyManager synergyMgr_;  // 羁绊管理器
 
     // 战斗相关
     float combatTimer_ = 0.f;       // 战斗计时器（已用时间）

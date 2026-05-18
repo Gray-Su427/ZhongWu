@@ -108,7 +108,7 @@ void WarriorUnit::updateCombat(float dt, float uniformScale) {
             attackTimer_ += dt;
             if (attackTimer_ >= attackSpeed_) {
                 attackTimer_ = 0.f;
-                performAttack(*target_);
+                performAttack(*target_, synergyATKBonus_, synergyCritBonus_);
             }
             break;
         }
@@ -216,7 +216,7 @@ void ArcherUnit::updateCombat(float dt, float uniformScale) {
             attackTimer_ += dt;
             if (attackTimer_ >= attackSpeed_) {
                 attackTimer_ = 0.f;
-                performAttack(*target_);
+                performAttack(*target_, synergyATKBonus_, synergyCritBonus_);
             }
             break;
         }
@@ -324,7 +324,7 @@ void MageUnit::updateCombat(float dt, float uniformScale) {
             attackTimer_ += dt;
             if (attackTimer_ >= attackSpeed_) {
                 attackTimer_ = 0.f;
-                performAttack(*target_);
+                performAttack(*target_, synergyATKBonus_, synergyCritBonus_);
             }
             break;
         }
@@ -342,7 +342,7 @@ void MageUnit::updateCombat(float dt, float uniformScale) {
     }
 }
 
-void MageUnit::performAttack(Unit& target) {
+void MageUnit::performAttack(Unit& target, int atkBonus, float critBonus) {
     if (!isAlive() || !target.isAlive()) return;
 
     static std::mt19937 rng(std::random_device{}());
@@ -351,7 +351,9 @@ void MageUnit::performAttack(Unit& target) {
         return;
     }
 
-    target.takeDamage(atk);
+    (void)critBonus; // 法师不使用暴击
+    int totalAtk = atk + atkBonus;
+    target.takeDamage(totalAtk);
 
     // 法师攻击增加Mana
     if (maxMana > 0) {
@@ -359,11 +361,13 @@ void MageUnit::performAttack(Unit& target) {
     }
 }
 
-void MageUnit::castAOE(const std::vector<Unit*>& enemies, float uniformScale) {
+void MageUnit::castAOE(const std::vector<Unit*>& enemies, float uniformScale, float aoeMultiplier) {
     if (!target_ || !target_->isAlive()) return;
 
     float aoeRadius = 128.f * uniformScale;
-    int aoeDamage = static_cast<int>(atk * 1.5f);
+    // 基础AOE伤害 = ATK * 1.5，再叠加羁绊提供的AOE倍率加成
+    float totalMultiplier = 1.5f + aoeMultiplier;
+    int aoeDamage = static_cast<int>(atk * totalMultiplier);
 
     for (auto* enemy : enemies) {
         if (!enemy || !enemy->isAlive()) continue;
@@ -460,7 +464,7 @@ void TankUnit::updateCombat(float dt, float uniformScale) {
             attackTimer_ += dt;
             if (attackTimer_ >= attackSpeed_) {
                 attackTimer_ = 0.f;
-                performAttack(*target_);
+                performAttack(*target_, synergyATKBonus_, synergyCritBonus_);
             }
             break;
         }
@@ -475,8 +479,11 @@ void TankUnit::updateCombat(float dt, float uniformScale) {
 
 void TankUnit::takeDamage(int dmg) {
     if (!isAlive()) return;
-    // 坦克减伤20%
-    int reduced = static_cast<int>(dmg * 0.8f);
+    // 坦克内置减伤20% + 羁绊减伤
+    float totalReduction = 0.20f + synergyDamageReduction_;
+    float multiplier = 1.0f - totalReduction;
+    if (multiplier < 0.1f) multiplier = 0.1f; // 最低10%受伤
+    int reduced = static_cast<int>(dmg * multiplier);
     setHP(hp - reduced);
 }
 
@@ -565,7 +572,7 @@ void AssassinUnit::updateCombat(float dt, float uniformScale) {
             attackTimer_ += dt;
             if (attackTimer_ >= attackSpeed_) {
                 attackTimer_ = 0.f;
-                performAttack(*target_);
+                performAttack(*target_, synergyATKBonus_, synergyCritBonus_);
             }
             break;
         }
@@ -578,7 +585,7 @@ void AssassinUnit::updateCombat(float dt, float uniformScale) {
     }
 }
 
-void AssassinUnit::performAttack(Unit& target) {
+void AssassinUnit::performAttack(Unit& target, int atkBonus, float critBonus) {
     if (!isAlive() || !target.isAlive()) return;
 
     static std::mt19937 rng(std::random_device{}());
@@ -589,9 +596,11 @@ void AssassinUnit::performAttack(Unit& target) {
         return;
     }
 
-    // 20%暴击率，暴击2倍伤害
-    bool isCrit = dist(rng) < 0.2f;
-    int damage = isCrit ? atk * 2 : atk;
+    // 基础20%暴击率 + 羁绊提供的额外暴击率，暴击2倍伤害
+    float totalCritChance = 0.2f + critBonus;
+    int totalAtk = atk + atkBonus;
+    bool isCrit = dist(rng) < totalCritChance;
+    int damage = isCrit ? totalAtk * 2 : totalAtk;
     target.takeDamage(damage);
 }
 

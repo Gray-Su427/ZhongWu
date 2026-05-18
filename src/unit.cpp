@@ -137,7 +137,11 @@ void Unit::attack(Unit& target) {
 
 void Unit::takeDamage(int dmg) {
     if (!isAlive()) return;
-    setHP(hp - dmg);
+    // 基类受伤：应用羁绊减伤（战士等使用此默认实现）
+    float multiplier = 1.0f - synergyDamageReduction_;
+    if (multiplier < 0.1f) multiplier = 0.1f;
+    int reduced = static_cast<int>(dmg * multiplier);
+    setHP(hp - reduced);
 }
 
 void Unit::heal(int amount) {
@@ -153,6 +157,14 @@ void Unit::resetCombatState() {
     attackTimer_ = 0.f;
     m_state = State::Idle;
     velocity = {0.f, 0.f};
+}
+
+// 清零所有羁绊Buff
+void Unit::clearSynergyBuffs() {
+    synergyATKBonus_ = 0;
+    synergyCritBonus_ = 0.f;
+    synergyDamageReduction_ = 0.f;
+    synergyAOEMultiplier_ = 0.f;
 }
 
 void Unit::setInCombat(bool v) { inCombat_ = v; }
@@ -174,7 +186,8 @@ Unit* Unit::getTarget() const { return target_; }
 void Unit::setTarget(Unit* t) { target_ = t; }
 
 // 执行攻击（含闪避判定）
-void Unit::performAttack(Unit& target) {
+// atkBonus: 羁绊提供的额外攻击力, critBonus: 羁绊提供的额外暴击率
+void Unit::performAttack(Unit& target, int atkBonus, float critBonus) {
     if (!isAlive() || !target.isAlive()) return;
 
     // 闪避判定
@@ -185,7 +198,9 @@ void Unit::performAttack(Unit& target) {
         return;
     }
 
-    target.takeDamage(atk);
+    (void)critBonus; // 基类不使用暴击，由子类覆盖
+    int totalAtk = atk + atkBonus;
+    target.takeDamage(totalAtk);
 
     // 攻击后增加Mana（如果有MaxMana）
     if (maxMana > 0) {

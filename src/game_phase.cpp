@@ -190,6 +190,19 @@ void GameManager::startCombat() {
     combatTimer_ = 0.f;
     combatActive_ = true;
 
+    // 计算羁绊 Buff
+    synergyMgr_.calculateSynergies(board_);
+
+    // 输出激活的羁绊信息
+    const auto& actives = synergyMgr_.getActiveSynergies();
+    for (const auto& s : actives) {
+        if (s.level > 0) {
+            std::cout << "[羁绊] " << s.traitName << " 激活! "
+                      << "数量:" << s.count << " 层级:" << s.level
+                      << " (" << s.buffDescription << ")" << std::endl;
+        }
+    }
+
     // 获取渲染器布局信息
     float uniformScale = 1.0f;
     sf::FloatRect boardBounds({0.f, 0.f}, {512.f, 512.f});
@@ -219,6 +232,14 @@ void GameManager::startCombat() {
             unit->setInCombat(true);
             unit->setBoardBounds(boardBounds);
             unit->resetCombatState();
+
+            // 为玩家单位设置羁绊 Buff
+            if (unit->owner() == Unit::Owner::PlayerCtrl) {
+                unit->setSynergyATKBonus(synergyMgr_.getATKBonus(unit));
+                unit->setSynergyCritBonus(synergyMgr_.getCritBonus(unit));
+                unit->setSynergyDamageReduction(synergyMgr_.getDamageReduction(unit));
+                unit->setSynergyAOEMultiplier(synergyMgr_.getAOEMultiplier(unit));
+            }
         }
     });
 
@@ -274,9 +295,9 @@ void GameManager::updateCombat(float dt) {
             auto* mage = dynamic_cast<MageUnit*>(unit);
             if (mage) {
                 if (unit->owner() == Unit::Owner::PlayerCtrl) {
-                    mage->castAOE(enemyUnits, uniformScale);
+                    mage->castAOE(enemyUnits, uniformScale, mage->getSynergyAOEMultiplier());
                 } else {
-                    mage->castAOE(playerUnits, uniformScale);
+                    mage->castAOE(playerUnits, uniformScale, 0.f);
                 }
             }
         }
@@ -363,16 +384,20 @@ void GameManager::resolveRound() {
         }
     }
 
-    // 恢复玩家单位HP，重置战斗状态
+    // 恢复玩家单位HP，重置战斗状态，清空羁绊Buff
     board_.forEachBoardUnit([](const BoardNS::GridPos& pos, Unit* unit) {
         if (unit->owner() == Unit::Owner::PlayerCtrl) {
             unit->setHP(unit->getMaxHP());
             unit->setState(Unit::State::Idle);
             unit->setInCombat(false);
             unit->resetCombatState();
+            unit->clearSynergyBuffs();
             // 重置位置到格子中心（由渲染器在下一帧处理）
         }
     });
+
+    // 清空羁绊缓存
+    synergyMgr_.clearSynergies();
 }
 
 // --- 经济系统 ---
@@ -512,6 +537,12 @@ void GameManager::addTestUnits() {
     board_.placeOnBench(board_.findEmptyBenchSlot(), std::move(as));
 
     spawnEnemyUnits();
+}
+
+// --- 羁绊系统 ---
+
+void GameManager::recalculateSynergies() {
+    synergyMgr_.calculateSynergies(board_);
 }
 
 } // namespace GamePhaseNS

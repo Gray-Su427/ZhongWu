@@ -126,7 +126,8 @@ public:
     Unit* getTarget() const;
     void setTarget(Unit* t);
     // 执行攻击（含闪避判定）
-    virtual void performAttack(Unit& target);
+    // atkBonus: 羁绊提供的额外攻击力, critBonus: 羁绊提供的额外暴击率
+    virtual void performAttack(Unit& target, int atkBonus = 0, float critBonus = 0.f);
     // 找最近的敌方单位
     Unit* findClosestEnemy(const std::vector<Unit*>& enemies) const;
     // 约束位置在棋盘边界内
@@ -142,6 +143,22 @@ public:
 
     // 辅助：获取包围盒（用于简单碰撞检测）
     virtual sf::FloatRect getBounds() const;
+
+    // --- 羁绊 Buff 接口 ---
+    // 设置羁绊提供的ATK加成
+    void setSynergyATKBonus(int bonus) { synergyATKBonus_ = bonus; }
+    int getSynergyATKBonus() const { return synergyATKBonus_; }
+    // 设置羁绊提供的暴击率加成
+    void setSynergyCritBonus(float bonus) { synergyCritBonus_ = bonus; }
+    float getSynergyCritBonus() const { return synergyCritBonus_; }
+    // 设置羁绊提供的减伤比例
+    void setSynergyDamageReduction(float reduction) { synergyDamageReduction_ = reduction; }
+    float getSynergyDamageReduction() const { return synergyDamageReduction_; }
+    // 设置羁绊提供的AOE伤害倍率加成
+    void setSynergyAOEMultiplier(float mult) { synergyAOEMultiplier_ = mult; }
+    float getSynergyAOEMultiplier() const { return synergyAOEMultiplier_; }
+    // 清零所有羁绊Buff
+    void clearSynergyBuffs();
 
     // 碰撞回调（可选覆盖）
     virtual void onCollision(Unit& other);
@@ -185,6 +202,12 @@ protected:
     Unit* target_ = nullptr;            // 当前攻击目标（不拥有所有权）
     bool inCombat_ = false;             // 是否处于战斗模式
     sf::FloatRect boardBounds_;         // 棋盘像素边界（约束移动范围）
+
+    // 羁绊 Buff（战斗开始时由外部设置，战斗结束后清零）
+    int synergyATKBonus_ = 0;           // 羁绊提供的额外攻击力
+    float synergyCritBonus_ = 0.f;      // 羁绊提供的额外暴击率
+    float synergyDamageReduction_ = 0.f;// 羁绊提供的减伤比例
+    float synergyAOEMultiplier_ = 0.f;  // 羁绊提供的AOE伤害倍率加成
 
     // 同步 shape 到 position/size/color
     void syncShape();
