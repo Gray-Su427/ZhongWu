@@ -129,6 +129,14 @@ void GameRenderer::drawUnitOnCell(sf::RenderWindow& window, Unit* unit,
         ? sf::Color(120, 180, 255) : sf::Color(255, 120, 120));
     window.draw(unitShape);
 
+    // 受击闪烁效果：半透明红色叠加
+    if (unit->isHitFlashing()) {
+        sf::RectangleShape hitOverlay({unitSize, unitSize});
+        hitOverlay.setPosition({centerX - halfUnit, centerY - halfUnit});
+        hitOverlay.setFillColor(sf::Color(255, 0, 0, 100));
+        window.draw(hitOverlay);
+    }
+
     // 绘制名称（使用SFML图形文字）
     float fontSize = cellSize * 0.22f;
     if (fontSize >= 8.f) {

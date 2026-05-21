@@ -16,7 +16,8 @@ enum class BuffType {
     DamageReduction,   // 减伤比例（0.0~1.0）
     ATKBonus,          // 攻击力加成
     AOEMultiplier,     // AOE伤害倍率加成（0.0~N）
-    CritBonus          // 暴击率加成（0.0~1.0）
+    CritBonus,         // 暴击率加成（0.0~1.0）
+    KillResetAttack    // 机制改变：击杀后重置攻击冷却（intValue=1 表示启用）
 };
 
 // 单个 Buff 效果
@@ -72,6 +73,9 @@ public:
 
     // 查询法师因羁绊获得的 AOE 伤害倍率加成（0.0~N）
     float getAOEMultiplier(const Unit* unit) const;
+
+    // 查询某单位是否有击杀重置攻击冷却的机制改变 Buff
+    bool hasKillResetAttack(const Unit* unit) const;
 
     // --- GUI 查询 ---
     // 获取当前激活的羁绊列表（供 ImGui 显示）

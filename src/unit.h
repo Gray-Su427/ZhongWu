@@ -157,8 +157,19 @@ public:
     // 设置羁绊提供的AOE伤害倍率加成
     void setSynergyAOEMultiplier(float mult) { synergyAOEMultiplier_ = mult; }
     float getSynergyAOEMultiplier() const { return synergyAOEMultiplier_; }
+    // 设置/获取击杀重置攻击冷却标记
+    void setSynergyKillReset(bool v) { synergyKillReset_ = v; }
+    bool getSynergyKillReset() const { return synergyKillReset_; }
     // 清零所有羁绊Buff
     void clearSynergyBuffs();
+
+    // --- 受击闪烁效果 ---
+    // 触发受击闪烁（受击时调用）
+    void triggerHitFlash();
+    // 查询是否正在闪烁
+    bool isHitFlashing() const;
+    // 更新闪烁计时器（每帧调用）
+    void updateHitFlash(float dt);
 
     // 碰撞回调（可选覆盖）
     virtual void onCollision(Unit& other);
@@ -208,6 +219,10 @@ protected:
     float synergyCritBonus_ = 0.f;      // 羁绊提供的额外暴击率
     float synergyDamageReduction_ = 0.f;// 羁绊提供的减伤比例
     float synergyAOEMultiplier_ = 0.f;  // 羁绊提供的AOE伤害倍率加成
+    bool synergyKillReset_ = false;     // 羁绊：击杀后重置攻击冷却
+
+    // 受击闪烁效果
+    float hitFlashTimer_ = 0.f;         // 受击闪烁倒计时（>0 表示正在闪烁）
 
     // 同步 shape 到 position/size/color
     void syncShape();

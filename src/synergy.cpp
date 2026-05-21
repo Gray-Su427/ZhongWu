@@ -53,6 +53,14 @@ SynergyManager::SynergyManager() {
             SynergyLevel{4, { SynergyBuff{BuffType::CritBonus, 0.40f, 0} }}
         }
     });
+
+    // 近战：机制改变 — 击杀后重置攻击冷却
+    synergyDefs_.push_back(SynergyDef{
+        "近战", "近战羁绊",
+        {
+            SynergyLevel{3, { SynergyBuff{BuffType::KillResetAttack, 0.f, 1} }}
+        }
+    });
 }
 
 void SynergyManager::calculateSynergies(const BoardNS::Board& board) {
@@ -114,6 +122,9 @@ void SynergyManager::calculateSynergies(const BoardNS::Board& board) {
                         break;
                     case BuffType::CritBonus:
                         desc << "暴击率+" << static_cast<int>(activeBuffs[b].value * 100) << "%";
+                        break;
+                    case BuffType::KillResetAttack:
+                        desc << "击杀重置攻击冷却";
                         break;
                 }
             }
@@ -214,6 +225,21 @@ const std::vector<ActiveSynergy>& SynergyManager::getActiveSynergies() const {
 
 const std::vector<SynergyDef>& SynergyManager::getAllSynergyDefs() const {
     return synergyDefs_;
+}
+
+bool SynergyManager::hasKillResetAttack(const Unit* unit) const {
+    if (!unit) return false;
+    for (const auto& trait : unit->getTraits()) {
+        auto* buffs = getBuffsForTrait(trait);
+        if (buffs) {
+            for (const auto& buff : *buffs) {
+                if (buff.type == BuffType::KillResetAttack && buff.intValue > 0) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 } // namespace SynergyNS

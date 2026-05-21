@@ -239,6 +239,7 @@ void GameManager::startCombat() {
                 unit->setSynergyCritBonus(synergyMgr_.getCritBonus(unit));
                 unit->setSynergyDamageReduction(synergyMgr_.getDamageReduction(unit));
                 unit->setSynergyAOEMultiplier(synergyMgr_.getAOEMultiplier(unit));
+                unit->setSynergyKillReset(synergyMgr_.hasKillResetAttack(unit));
             }
         }
     });
@@ -276,6 +277,9 @@ void GameManager::updateCombat(float dt) {
     for (auto* unit : allUnits) {
         if (!unit->isAlive()) continue;
 
+        // 更新受击闪烁计时器
+        unit->updateHitFlash(dt);
+
         // 检查当前目标是否仍然有效
         Unit* currentTarget = unit->getTarget();
         if (!currentTarget || !currentTarget->isAlive()) {
@@ -286,6 +290,10 @@ void GameManager::updateCombat(float dt) {
                 unit->setTarget(unit->findClosestEnemy(playerUnits));
             }
         }
+
+        // 记录攻击前目标存活状态
+        Unit* target = unit->getTarget();
+        bool targetAliveBefore = (target && target->isAlive());
 
         // 更新战斗FSM
         unit->updateCombat(dt, uniformScale);
@@ -300,6 +308,12 @@ void GameManager::updateCombat(float dt) {
                     mage->castAOE(playerUnits, uniformScale, 0.f);
                 }
             }
+        }
+
+        // 近战羁绊：击杀后重置攻击冷却
+        if (targetAliveBefore && target && !target->isAlive() && unit->getSynergyKillReset()) {
+            unit->resetCombatState();  // 重置攻击计时器，允许立刻再次攻击
+            std::cout << "[近战羁绊] " << unit->getUnitName() << " 击杀后重置攻击冷却！" << std::endl;
         }
     }
 }

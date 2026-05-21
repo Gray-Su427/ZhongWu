@@ -114,6 +114,18 @@ void Unit::syncShape() {
 
 void Unit::render(sf::RenderWindow& window) const {
     window.draw(shape);
+
+    // 受击闪烁效果：在单位上方叠加半透明红色
+    if (hitFlashTimer_ > 0.f) {
+        sf::RectangleShape flashShape;
+        flashShape.setSize(size);
+        flashShape.setOrigin(size * 0.5f);
+        flashShape.setPosition(position);
+        // 透明度随时间衰减
+        uint8_t alpha = static_cast<uint8_t>(std::min(hitFlashTimer_ / 0.15f, 1.0f) * 120.f);
+        flashShape.setFillColor(sf::Color(255, 0, 0, alpha));
+        window.draw(flashShape);
+    }
 }
 
 sf::FloatRect Unit::getBounds() const {
@@ -137,6 +149,8 @@ void Unit::attack(Unit& target) {
 
 void Unit::takeDamage(int dmg) {
     if (!isAlive()) return;
+    // 触发受击闪烁
+    triggerHitFlash();
     // 基类受伤：应用羁绊减伤（战士等使用此默认实现）
     float multiplier = 1.0f - synergyDamageReduction_;
     if (multiplier < 0.1f) multiplier = 0.1f;
@@ -165,6 +179,23 @@ void Unit::clearSynergyBuffs() {
     synergyCritBonus_ = 0.f;
     synergyDamageReduction_ = 0.f;
     synergyAOEMultiplier_ = 0.f;
+    synergyKillReset_ = false;
+}
+
+// --- 受击闪烁效果 ---
+void Unit::triggerHitFlash() {
+    hitFlashTimer_ = 0.15f;  // 闪烁持续 0.15 秒
+}
+
+bool Unit::isHitFlashing() const {
+    return hitFlashTimer_ > 0.f;
+}
+
+void Unit::updateHitFlash(float dt) {
+    if (hitFlashTimer_ > 0.f) {
+        hitFlashTimer_ -= dt;
+        if (hitFlashTimer_ < 0.f) hitFlashTimer_ = 0.f;
+    }
 }
 
 void Unit::setInCombat(bool v) { inCombat_ = v; }
