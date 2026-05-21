@@ -369,24 +369,6 @@ void GameManager::resolveRound() {
         std::cout << "第 " << currentRound_ << " 轮：失败！扣除 " << damage << " HP" << std::endl;
     }
 
-    // 将玩家单位的像素位置映射回最近的格子
-    if (renderer_) {
-        board_.forEachBoardUnit([&](const BoardNS::GridPos& pos, Unit* unit) {
-            if (unit->owner() == Unit::Owner::PlayerCtrl && unit->isAlive()) {
-                // 找到最近的空格子
-                sf::Vector2f pixelPos = unit->getPosition();
-                BoardNS::GridPos nearestPos = renderer_->screenToBoardCell(pixelPos);
-                if (nearestPos.isValid() && nearestPos != pos) {
-                    // 如果目标格子为空或就是自己，移动
-                    if (board_.isBoardCellEmpty(nearestPos)) {
-                        auto unitPtr = board_.removeFromBoard(pos);
-                        board_.placeOnBoard(nearestPos, std::move(unitPtr));
-                    }
-                }
-            }
-        });
-    }
-
     // 清除敌方单位
     for (int r = 0; r < board_.getRows(); ++r) {
         for (int c = 0; c < board_.getCols(); ++c) {
